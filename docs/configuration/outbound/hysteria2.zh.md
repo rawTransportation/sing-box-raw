@@ -34,6 +34,28 @@
   "password": "goofy_ahh_password",
   "network": "tcp",
   "tls": {},
+  "udp2raw": {
+    "mode": "auto",
+    "port": 0,
+    "auth": "",
+    "mtu": 1500,
+    "keep_alive": "15s",
+    "idle_timeout": "45s",
+    "handshake_timeout": "8s",
+    "camouflage": "none",
+    "sni": "",
+    "faketcp": {
+      "src_port": 0,
+      "ttl": 64,
+      "mss": 1460,
+      "window_scale": 7,
+      "gro_split": "auto",
+      "raw_interface": ""
+    },
+    "tcp": {
+      "dial_timeout": "8s"
+    }
+  },
 
   ... // QUIC 字段
 
@@ -266,6 +288,79 @@ Realm 的 Bearer 令牌，需与 realm 上配置的 `users[].token` 之一匹配
 与 realm 通信使用的 HTTP 客户端。
 
 参阅 [HTTP 客户端](/zh/configuration/shared/http-client/) 了解详情。
+
+### UDP2Raw 字段
+
+!!! question "自 sing-box 1.15.0"
+
+把 QUIC 数据报装进一条"看起来是 TCP"的通道，从而绕开 UDP 阻断、UDP QoS 与 QUIC 指纹识别。
+两端必须同时启用，且 `mode` 与 `auth` 一致。
+
+`faketcp` 直接在线上构造 TCP 段：本层不重传、不做拥塞控制，QUIC 的行为与跑在 UDP 上完全一致。
+`tcp` 把数据报分帧塞进真实 TCP 连接，不需要特权，但会承受 TCP-over-TCP 的队头阻塞。
+
+`udp2raw` 与 `server_ports`、`hop_interval`、`hop_interval_max`、`realm` 冲突。
+
+#### udp2raw.mode
+
+承载模式，可选 `auto` `faketcp` `tcp`。
+
+默认 `auto`：有裸套接字权限时优先 `faketcp`，平台或权限不允许时回退 `tcp`。
+
+#### udp2raw.port
+
+承载层 TCP 端口，`0` 表示复用 `server_port`。
+
+#### udp2raw.auth
+
+可选的预共享串，用 HMAC 时间戳做准入。它不是加密，机密性仍由 QUIC/TLS 提供。
+
+#### udp2raw.mtu
+
+承载层必须容纳的路径 MTU，默认 `1500`。PPPoE（1492）或隧道链路上请填真实值。
+
+未显式设置 `initial_packet_size` 时，它由该值推导（钳制在 1200..1280），
+保证 QUIC 的首包不会超过路径 MTU。
+
+#### udp2raw.keep_alive
+
+保活包间隔，默认 `15s`。
+
+#### udp2raw.idle_timeout
+
+超过该空闲时间判定会话死亡，默认 `45s`。
+
+#### udp2raw.handshake_timeout
+
+承载层握手允许的总时长，默认 `8s`。
+
+#### udp2raw.camouflage
+
+`none` 或 `tls`，默认 `none`。
+
+`tls` 会把帧装进 TLS 记录并做一次伪 TLS 握手，使流量外观像 HTTPS。
+它只做外观：证书是自签的，真实 TLS 客户端无法完成握手。
+
+#### udp2raw.sni
+
+`camouflage: tls` 使用的 SNI，默认为服务器主机名。
+
+#### udp2raw.faketcp
+
+| 字段 | 默认值 | 说明 |
+|------|--------|------|
+| `src_port` | `0` | 源 TCP 端口，`0` 表示随机 |
+| `ttl` | `64` | 写入 IPv4 头的 TTL |
+| `mss` | `mtu - 40` | TCP 选项里通告的 MSS |
+| `window_scale` | `7` | TCP 选项里通告的窗口缩放 |
+| `gro_split` | `auto` | 按 MSS 拆分 GRO 聚合包 |
+| `raw_interface` | `""` | 抓包绑定的网卡，空表示全部 |
+
+#### udp2raw.tcp
+
+| 字段 | 默认值 | 说明 |
+|------|--------|------|
+| `dial_timeout` | `8s` | 拨号承载层的超时 |
 
 ### 拨号字段
 

@@ -38,6 +38,7 @@ linters:
       - common-false-positives
     paths:
       - transport/simple-obfs
+      - transport/udp2raw
       - \.pb\.go$
       - third_party$
       - builtin$

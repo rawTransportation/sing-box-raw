@@ -23,10 +23,54 @@ type Hysteria2InboundOptions struct {
 	IgnoreClientBandwidth bool            `json:"ignore_client_bandwidth,omitempty"`
 	InboundTLSOptionsContainer
 	QUICOptions
-	Masquerade  *Hysteria2Masquerade   `json:"masquerade,omitempty"`
-	BBRProfile  string                 `json:"bbr_profile,omitempty" enum:"standard,conservative,aggressive"`
-	BrutalDebug bool                   `json:"brutal_debug,omitempty"`
-	Realm       *Hysteria2InboundRealm `json:"realm,omitempty"`
+	Masquerade  *Hysteria2Masquerade            `json:"masquerade,omitempty"`
+	BBRProfile  string                          `json:"bbr_profile,omitempty" enum:"standard,conservative,aggressive"`
+	BrutalDebug bool                            `json:"brutal_debug,omitempty"`
+	Realm       *Hysteria2InboundRealm          `json:"realm,omitempty"`
+	UDP2Raw     *Hysteria2UDP2RawInboundOptions `json:"udp2raw,omitempty"`
+}
+
+// Hysteria2UDP2RawFakeTCPOptions configures the fake-TCP carrier: TCP segments
+// are crafted on the wire while retransmission and congestion control are left
+// to QUIC.
+type Hysteria2UDP2RawFakeTCPOptions struct {
+	SrcPort      uint16 `json:"src_port,omitempty"`
+	TTL          uint8  `json:"ttl,omitempty"`
+	MSS          uint16 `json:"mss,omitempty"`
+	WindowScale  uint8  `json:"window_scale,omitempty"`
+	GROSplit     string `json:"gro_split,omitempty" enum:"auto,on,off"`
+	RawInterface string `json:"raw_interface,omitempty"`
+}
+
+// Hysteria2UDP2RawTCPOptions configures the real-TCP carrier, the fallback for
+// platforms without raw socket support.
+type Hysteria2UDP2RawTCPOptions struct {
+	DialTimeout badoption.Duration `json:"dial_timeout,omitempty"`
+	Listen      string             `json:"listen,omitempty"`
+}
+
+// Hysteria2UDP2RawOptions is the shared part of the udp2raw transport, which
+// carries QUIC datagrams inside a channel that looks like a TCP flow.
+type Hysteria2UDP2RawOptions struct {
+	Mode             string                         `json:"mode,omitempty" enum:"auto,faketcp,tcp"`
+	Port             uint16                         `json:"port,omitempty"`
+	Auth             string                         `json:"auth,omitempty"`
+	MTU              int                            `json:"mtu,omitempty"`
+	KeepAlive        badoption.Duration             `json:"keep_alive,omitempty"`
+	IdleTimeout      badoption.Duration             `json:"idle_timeout,omitempty"`
+	HandshakeTimeout badoption.Duration             `json:"handshake_timeout,omitempty"`
+	Camouflage       string                         `json:"camouflage,omitempty" enum:"none,tls"`
+	SNI              string                         `json:"sni,omitempty"`
+	FakeTCP          Hysteria2UDP2RawFakeTCPOptions `json:"faketcp,omitempty"`
+	TCP              Hysteria2UDP2RawTCPOptions     `json:"tcp,omitempty"`
+}
+
+// Hysteria2UDP2RawInboundOptions adds the server-only knobs.
+type Hysteria2UDP2RawInboundOptions struct {
+	Hysteria2UDP2RawOptions
+	AutoFirewall     bool `json:"auto_firewall,omitempty"`
+	MaxSessions      int  `json:"max_sessions,omitempty"`
+	MaxSessionsPerIP int  `json:"max_sessions_per_ip,omitempty"`
 }
 
 type Hysteria2Realm struct {
@@ -217,10 +261,11 @@ type Hysteria2OutboundOptions struct {
 	Network        NetworkList            `json:"network,omitempty"`
 	OutboundTLSOptionsContainer
 	QUICOptions
-	BBRProfile          string          `json:"bbr_profile,omitempty" enum:"standard,conservative,aggressive"`
-	BrutalDebug         bool            `json:"brutal_debug,omitempty"`
-	DisableChromeParrot bool            `json:"disable_chrome_parrot,omitempty"`
-	Realm               *Hysteria2Realm `json:"realm,omitempty"`
+	BBRProfile          string                   `json:"bbr_profile,omitempty" enum:"standard,conservative,aggressive"`
+	BrutalDebug         bool                     `json:"brutal_debug,omitempty"`
+	DisableChromeParrot bool                     `json:"disable_chrome_parrot,omitempty"`
+	Realm               *Hysteria2Realm          `json:"realm,omitempty"`
+	UDP2Raw             *Hysteria2UDP2RawOptions `json:"udp2raw,omitempty"`
 }
 
 type HysteriaRealmUser struct {

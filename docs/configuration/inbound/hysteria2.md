@@ -36,6 +36,30 @@ icon: material/alert-decagram
   ],
   "ignore_client_bandwidth": false,
   "tls": {},
+  "udp2raw": {
+    "mode": "auto",
+    "port": 0,
+    "auth": "",
+    "mtu": 1500,
+    "keep_alive": "15s",
+    "idle_timeout": "60s",
+    "handshake_timeout": "8s",
+    "camouflage": "none",
+    "sni": "",
+    "faketcp": {
+      "ttl": 64,
+      "mss": 1460,
+      "window_scale": 7,
+      "gro_split": "auto",
+      "raw_interface": ""
+    },
+    "tcp": {
+      "listen": ""
+    },
+    "auto_firewall": false,
+    "max_sessions": 8192,
+    "max_sessions_per_ip": 256
+  },
 
   ... // QUIC Fields
 
@@ -129,6 +153,104 @@ Deny clients to use the BBR CC.
 ==Required==
 
 TLS configuration, see [TLS](/configuration/shared/tls/#inbound).
+
+### UDP2Raw Fields
+
+!!! question "Since sing-box 1.15.0"
+
+Accept QUIC datagrams from a channel that looks like a TCP flow, so that UDP blocking, UDP QoS
+and QUIC fingerprinting no longer apply. Both ends must enable it with the same mode and `auth`.
+
+With `faketcp` the segments are crafted on the wire: nothing is retransmitted and no congestion
+control is applied, so QUIC keeps working exactly as it does over UDP. With `tcp` the datagrams are
+framed inside a real TCP connection, which needs no privileges but suffers from TCP-over-TCP
+head-of-line blocking.
+
+`udp2raw` conflicts with `realm`. It replaces the UDP socket of this inbound: `listen` and
+`listen_port` only describe the logical endpoint, the carrier listens on `udp2raw.port`.
+
+#### udp2raw.mode
+
+Carrier mode, one of `auto`, `faketcp`, `tcp`.
+
+`auto` is used by default. It prefers `faketcp` where raw sockets are available and falls back to
+`tcp` when the platform or the process privileges do not allow them.
+
+#### udp2raw.port
+
+The carrier TCP port, `0` to reuse `listen_port`.
+
+`faketcp` occupies the TCP port on the wire, so nothing else may listen on it, and the kernel
+responses to it must be suppressed, see `auto_firewall`.
+
+#### udp2raw.auth
+
+Optional pre-shared string used to admit clients with an HMAC timestamp. It is not encryption:
+confidentiality is still provided by QUIC/TLS.
+
+#### udp2raw.mtu
+
+Path MTU the carrier must fit into, `1500` by default. Set it to the real link MTU on PPPoE (1492)
+or tunneled links.
+
+When `initial_packet_size` is unset, it is derived from this value (clamped between 1200 and 1280),
+so the first QUIC packets never exceed the path MTU.
+
+#### udp2raw.keep_alive
+
+Interval between keep-alive packets, `15s` by default.
+
+#### udp2raw.idle_timeout
+
+Idle timeout after which the session is reclaimed, `60s` by default.
+
+#### udp2raw.handshake_timeout
+
+Total time allowed for the carrier handshake, `8s` by default.
+
+#### udp2raw.camouflage
+
+`none` or `tls`, `none` by default.
+
+With `tls`, frames are wrapped in TLS records and a fake TLS handshake is performed, so the flow
+looks like HTTPS. It is cosmetic only: the certificate is self-signed and a real TLS client cannot
+complete the handshake.
+
+#### udp2raw.sni
+
+SNI used by `camouflage: tls`.
+
+#### udp2raw.faketcp
+
+| Field | Default | Description |
+|-------|---------|-------------|
+| `ttl` | `64` | TTL written into the IPv4 header |
+| `mss` | `mtu - 40` | MSS advertised in the TCP options |
+| `window_scale` | `7` | Window scale advertised in the TCP options |
+| `gro_split` | `auto` | Split GRO batches at the MSS |
+| `raw_interface` | `""` | Interface the capture socket is bound to, empty means all |
+
+`faketcp` requires `CAP_NET_RAW` on Linux, or `WinDivert.dll` and `WinDivert64.sys` next to the
+executable on Windows. It only supports IPv4.
+
+#### udp2raw.tcp
+
+| Field | Default | Description |
+|-------|---------|-------------|
+| `listen` | `:<udp2raw.port>` | Address the carrier listens on |
+
+#### udp2raw.auto_firewall
+
+Automatically install and remove the kernel RST suppression rules `faketcp` needs, using `nft` or
+`iptables`. Requires root, Linux only, disabled by default.
+
+#### udp2raw.max_sessions
+
+Maximum number of concurrent sessions, `8192` by default.
+
+#### udp2raw.max_sessions_per_ip
+
+Maximum number of concurrent sessions per source IP, `256` by default.
 
 ### QUIC Fields
 

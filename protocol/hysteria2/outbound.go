@@ -16,6 +16,7 @@ import (
 	C "github.com/sagernet/sing-box/constant"
 	"github.com/sagernet/sing-box/log"
 	"github.com/sagernet/sing-box/option"
+	"github.com/sagernet/sing-box/transport/udp2raw"
 	qtls "github.com/sagernet/sing-quic"
 	"github.com/sagernet/sing-quic/hysteria"
 	"github.com/sagernet/sing-quic/hysteria2"
@@ -77,6 +78,23 @@ func NewOutbound(ctx context.Context, router adapter.Router, logger log.ContextL
 		}
 	}
 	realmSTUNServersIsDomain := options.Realm != nil && options.Realm.STUNServersIsDomain()
+	if options.UDP2Raw != nil {
+		if options.Realm != nil {
+			return nil, E.New("udp2raw conflicts with realm")
+		}
+		if len(options.ServerPorts) > 0 || options.HopInterval > 0 || options.HopIntervalMax > 0 {
+			return nil, E.New("udp2raw conflicts with server_ports and hop_interval")
+		}
+		validateConfig := newUDP2RawClientConfig(options.UDP2Raw, M.ParseSocksaddr(options.Server).Fqdn, nil)
+		validateConfig.ServerAddr = &net.UDPAddr{Port: int(options.ServerOptions.Build().Port)}
+		_, err = udp2raw.PrepareClientConfig(validateConfig)
+		if err != nil {
+			return nil, E.Cause(err, "initialize udp2raw")
+		}
+		if options.InitialPacketSize == 0 {
+			options.InitialPacketSize = udp2rawInitialPacketSize(options.UDP2Raw)
+		}
+	}
 	outboundDialer, err := dialer.NewWithOptions(dialer.Options{
 		Context:          ctx,
 		Options:          options.DialerOptions,
@@ -126,9 +144,13 @@ func NewOutbound(ctx context.Context, router adapter.Router, logger log.ContextL
 		}
 	}
 	networkList := options.Network.Build()
+	var clientDialer N.Dialer = outboundDialer
+	if options.UDP2Raw != nil {
+		clientDialer = newUDP2RawDialer(outboundDialer, logger, M.ParseSocksaddr(options.Server).Fqdn, options.UDP2Raw)
+	}
 	client, err := hysteria2.NewClient(hysteria2.ClientOptions{
 		Context:            ctx,
-		Dialer:             outboundDialer,
+		Dialer:             clientDialer,
 		Logger:             logger,
 		BrutalDebug:        options.BrutalDebug,
 		ServerAddress:      options.ServerOptions.Build(),

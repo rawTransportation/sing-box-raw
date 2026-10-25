@@ -2,6 +2,7 @@ package hysteria2
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"net/http"
 	"net/http/httputil"
@@ -18,6 +19,7 @@ import (
 	C "github.com/sagernet/sing-box/constant"
 	"github.com/sagernet/sing-box/log"
 	"github.com/sagernet/sing-box/option"
+	"github.com/sagernet/sing-box/transport/udp2raw"
 	qtls "github.com/sagernet/sing-quic"
 	"github.com/sagernet/sing-quic/hysteria"
 	"github.com/sagernet/sing-quic/hysteria2"
@@ -43,6 +45,8 @@ type Inbound struct {
 	tlsConfig    tls.ServerConfig
 	service      *hysteria2.Service[int]
 	userNameList []string
+	udp2raw      *udp2raw.ServerConfig
+	udp2rawAddr  M.Socksaddr
 }
 
 func NewInbound(ctx context.Context, router adapter.Router, logger log.ContextLogger, tag string, options option.Hysteria2InboundOptions) (adapter.Inbound, error) {
@@ -123,6 +127,22 @@ func NewInbound(ctx context.Context, router adapter.Router, logger log.ContextLo
 			Listen:  options.ListenOptions,
 		}),
 		tlsConfig: tlsConfig,
+	}
+	if options.UDP2Raw != nil {
+		if options.Realm != nil {
+			return nil, E.New("udp2raw conflicts with realm")
+		}
+		udp2rawConfig, err := newUDP2RawServerConfig(options.UDP2Raw, options.ListenOptions, func(format string, args ...any) {
+			logger.Debug(fmt.Sprintf(format, args...))
+		})
+		if err != nil {
+			return nil, E.Cause(err, "initialize udp2raw")
+		}
+		inbound.udp2raw = &udp2rawConfig
+		inbound.udp2rawAddr = udp2rawListenAddress(options.ListenOptions, udp2rawConfig.Port)
+		if options.InitialPacketSize == 0 {
+			options.InitialPacketSize = udp2rawInitialPacketSize(&options.UDP2Raw.Hysteria2UDP2RawOptions)
+		}
 	}
 	var udpTimeout time.Duration
 	if options.UDPTimeout != 0 {
@@ -232,7 +252,7 @@ func (h *Inbound) NewConnectionEx(ctx context.Context, conn net.Conn, source M.S
 	//nolint:staticcheck
 	metadata.InboundDetour = h.listener.ListenOptions().Detour
 	//nolint:staticcheck
-	metadata.OriginDestination = h.listener.UDPAddr()
+	metadata.OriginDestination = h.originDestination()
 	metadata.Source = source
 	metadata.Destination = destination
 	h.logger.InfoContext(ctx, "inbound connection from ", metadata.Source)
@@ -254,7 +274,7 @@ func (h *Inbound) NewPacketConnectionEx(ctx context.Context, conn N.PacketConn, 
 	//nolint:staticcheck
 	metadata.InboundDetour = h.listener.ListenOptions().Detour
 	//nolint:staticcheck
-	metadata.OriginDestination = h.listener.UDPAddr()
+	metadata.OriginDestination = h.originDestination()
 	metadata.Source = source
 	metadata.Destination = destination
 	h.logger.InfoContext(ctx, "inbound packet connection from ", metadata.Source)
@@ -279,11 +299,15 @@ func (h *Inbound) Start(stage adapter.StartStage, scope *adapter.Scope) error {
 		}
 		scope.Add(h.tlsConfig.Close)
 	}
-	packetConn, err := h.listener.ListenUDP()
+	packetConn, err := h.listenPacket()
 	if err != nil {
 		return err
 	}
-	scope.Add(h.listener.Close)
+	if h.udp2raw != nil {
+		scope.Add(packetConn.Close)
+	} else {
+		scope.Add(h.listener.Close)
+	}
 	err = h.service.Start(packetConn)
 	if err != nil {
 		return err
@@ -292,6 +316,27 @@ func (h *Inbound) Start(stage adapter.StartStage, scope *adapter.Scope) error {
 	return nil
 }
 
+// listenPacket opens the socket the QUIC stack listens on: either the regular
+// UDP socket or the udp2raw carrier.
+func (h *Inbound) listenPacket() (net.PacketConn, error) {
+	if h.udp2raw == nil {
+		return h.listener.ListenUDP()
+	}
+	serverConn, err := udp2raw.NewServerConn(*h.udp2raw)
+	if err != nil {
+		return nil, E.Cause(err, "listen udp2raw")
+	}
+	return serverConn, nil
+}
+
 func (h *Inbound) InterfaceUpdated(ctx context.Context) {
 	h.service.Reset()
+}
+
+// originDestination reports the local address the inbound accepts traffic on.
+func (h *Inbound) originDestination() M.Socksaddr {
+	if h.udp2raw != nil {
+		return h.udp2rawAddr
+	}
+	return h.listener.UDPAddr()
 }

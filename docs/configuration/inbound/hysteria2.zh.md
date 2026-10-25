@@ -36,6 +36,30 @@ icon: material/alert-decagram
   ],
   "ignore_client_bandwidth": false,
   "tls": {},
+  "udp2raw": {
+    "mode": "auto",
+    "port": 0,
+    "auth": "",
+    "mtu": 1500,
+    "keep_alive": "15s",
+    "idle_timeout": "60s",
+    "handshake_timeout": "8s",
+    "camouflage": "none",
+    "sni": "",
+    "faketcp": {
+      "ttl": 64,
+      "mss": 1460,
+      "window_scale": 7,
+      "gro_split": "auto",
+      "raw_interface": ""
+    },
+    "tcp": {
+      "listen": ""
+    },
+    "auto_firewall": false,
+    "max_sessions": 8192,
+    "max_sessions_per_ip": 256
+  },
 
   ... // QUIC 字段
 
@@ -126,6 +150,98 @@ Hysteria 用户
 ==必填==
 
 TLS 配置, 参阅 [TLS](/zh/configuration/shared/tls/#入站)。
+
+### UDP2Raw 字段
+
+!!! question "自 sing-box 1.15.0"
+
+从一条"看起来是 TCP"的通道接收 QUIC 数据报，从而绕开 UDP 阻断、UDP QoS 与 QUIC 指纹识别。
+两端必须同时启用，且 `mode` 与 `auth` 一致。
+
+`faketcp` 直接在线上构造 TCP 段：本层不重传、不做拥塞控制，QUIC 的行为与跑在 UDP 上完全一致。
+`tcp` 把数据报分帧塞进真实 TCP 连接，不需要特权，但会承受 TCP-over-TCP 的队头阻塞。
+
+`udp2raw` 与 `realm` 冲突。它替换本入站的 UDP 套接字：`listen` 与 `listen_port` 只描述逻辑端点，
+承载层实际监听在 `udp2raw.port`。
+
+#### udp2raw.mode
+
+承载模式，可选 `auto` `faketcp` `tcp`。
+
+默认 `auto`：有裸套接字权限时优先 `faketcp`，平台或权限不允许时回退 `tcp`。
+
+#### udp2raw.port
+
+承载层 TCP 端口，`0` 表示复用 `listen_port`。
+
+`faketcp` 会在线上占用该 TCP 端口，因此不能有其他程序监听它，还需要抑制内核对它的响应，
+见 `auto_firewall`。
+
+#### udp2raw.auth
+
+可选的预共享串，用 HMAC 时间戳做准入。它不是加密，机密性仍由 QUIC/TLS 提供。
+
+#### udp2raw.mtu
+
+承载层必须容纳的路径 MTU，默认 `1500`。PPPoE（1492）或隧道链路上请填真实值。
+
+未显式设置 `initial_packet_size` 时，它由该值推导（钳制在 1200..1280），
+保证 QUIC 的首包不会超过路径 MTU。
+
+#### udp2raw.keep_alive
+
+保活包间隔，默认 `15s`。
+
+#### udp2raw.idle_timeout
+
+超过该空闲时间回收会话，默认 `60s`。
+
+#### udp2raw.handshake_timeout
+
+承载层握手允许的总时长，默认 `8s`。
+
+#### udp2raw.camouflage
+
+`none` 或 `tls`，默认 `none`。
+
+`tls` 会把帧装进 TLS 记录并做一次伪 TLS 握手，使流量外观像 HTTPS。
+它只做外观：证书是自签的，真实 TLS 客户端无法完成握手。
+
+#### udp2raw.sni
+
+`camouflage: tls` 使用的 SNI。
+
+#### udp2raw.faketcp
+
+| 字段 | 默认值 | 说明 |
+|------|--------|------|
+| `ttl` | `64` | 写入 IPv4 头的 TTL |
+| `mss` | `mtu - 40` | TCP 选项里通告的 MSS |
+| `window_scale` | `7` | TCP 选项里通告的窗口缩放 |
+| `gro_split` | `auto` | 按 MSS 拆分 GRO 聚合包 |
+| `raw_interface` | `""` | 抓包绑定的网卡，空表示全部 |
+
+`faketcp` 在 Linux 上需要 `CAP_NET_RAW`，在 Windows 上需要可执行文件旁有
+`WinDivert.dll` 与 `WinDivert64.sys`。它只支持 IPv4。
+
+#### udp2raw.tcp
+
+| 字段 | 默认值 | 说明 |
+|------|--------|------|
+| `listen` | `:<udp2raw.port>` | 承载层监听地址 |
+
+#### udp2raw.auto_firewall
+
+用 `nft` 或 `iptables` 自动安装并清理 `faketcp` 所需的内核 RST 抑制规则。
+需要 root，仅 Linux，默认关闭。
+
+#### udp2raw.max_sessions
+
+最大并发会话数，默认 `8192`。
+
+#### udp2raw.max_sessions_per_ip
+
+单个源 IP 的最大并发会话数，默认 `256`。
 
 ### QUIC 字段
 

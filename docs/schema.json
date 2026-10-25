@@ -6083,6 +6083,164 @@
       },
       "additionalProperties": false
     },
+    "Hysteria2UDP2RawFakeTCPOptions": {
+      "type": "object",
+      "properties": {
+        "src_port": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 65535
+        },
+        "ttl": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 255
+        },
+        "mss": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 65535
+        },
+        "window_scale": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 255
+        },
+        "gro_split": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "on",
+            "off"
+          ]
+        },
+        "raw_interface": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "Hysteria2UDP2RawInboundOptions": {
+      "type": "object",
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "faketcp",
+            "tcp"
+          ]
+        },
+        "port": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 65535
+        },
+        "auth": {
+          "type": "string"
+        },
+        "mtu": {
+          "type": "integer"
+        },
+        "keep_alive": {
+          "$ref": "#/$defs/Duration"
+        },
+        "idle_timeout": {
+          "$ref": "#/$defs/Duration"
+        },
+        "handshake_timeout": {
+          "$ref": "#/$defs/Duration"
+        },
+        "camouflage": {
+          "type": "string",
+          "enum": [
+            "none",
+            "tls"
+          ]
+        },
+        "sni": {
+          "type": "string"
+        },
+        "faketcp": {
+          "$ref": "#/$defs/Hysteria2UDP2RawFakeTCPOptions"
+        },
+        "tcp": {
+          "$ref": "#/$defs/Hysteria2UDP2RawTCPOptions"
+        },
+        "auto_firewall": {
+          "type": "boolean"
+        },
+        "max_sessions": {
+          "type": "integer"
+        },
+        "max_sessions_per_ip": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false
+    },
+    "Hysteria2UDP2RawOptions": {
+      "type": "object",
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "faketcp",
+            "tcp"
+          ]
+        },
+        "port": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 65535
+        },
+        "auth": {
+          "type": "string"
+        },
+        "mtu": {
+          "type": "integer"
+        },
+        "keep_alive": {
+          "$ref": "#/$defs/Duration"
+        },
+        "idle_timeout": {
+          "$ref": "#/$defs/Duration"
+        },
+        "handshake_timeout": {
+          "$ref": "#/$defs/Duration"
+        },
+        "camouflage": {
+          "type": "string",
+          "enum": [
+            "none",
+            "tls"
+          ]
+        },
+        "sni": {
+          "type": "string"
+        },
+        "faketcp": {
+          "$ref": "#/$defs/Hysteria2UDP2RawFakeTCPOptions"
+        },
+        "tcp": {
+          "$ref": "#/$defs/Hysteria2UDP2RawTCPOptions"
+        }
+      },
+      "additionalProperties": false
+    },
+    "Hysteria2UDP2RawTCPOptions": {
+      "type": "object",
+      "properties": {
+        "dial_timeout": {
+          "$ref": "#/$defs/Duration"
+        },
+        "listen": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
     "Hysteria2User": {
       "type": "object",
       "properties": {
@@ -6931,6 +7089,9 @@
             },
             "realm": {
               "$ref": "#/$defs/Hysteria2InboundRealm"
+            },
+            "udp2raw": {
+              "$ref": "#/$defs/Hysteria2UDP2RawInboundOptions"
             }
           },
           "required": [
@@ -12400,6 +12561,9 @@
             },
             "realm": {
               "$ref": "#/$defs/Hysteria2Realm"
+            },
+            "udp2raw": {
+              "$ref": "#/$defs/Hysteria2UDP2RawOptions"
             }
           },
           "required": [
