@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/sagernet/sing/common/json"
+
 	"github.com/stretchr/testify/require"
 )
 
