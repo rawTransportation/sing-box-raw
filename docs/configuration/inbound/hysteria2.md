@@ -224,6 +224,7 @@ SNI used by `camouflage: tls`.
 
 | Field | Default | Description |
 |-------|---------|-------------|
+| `src_port` | `0` | Source TCP port, client side only |
 | `ttl` | `64` | TTL written into the IPv4 header |
 | `mss` | `mtu - 40` | MSS advertised in the TCP options |
 | `window_scale` | `7` | Window scale advertised in the TCP options |

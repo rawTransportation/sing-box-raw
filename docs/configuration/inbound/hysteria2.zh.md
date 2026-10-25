@@ -215,6 +215,7 @@ TLS 配置, 参阅 [TLS](/zh/configuration/shared/tls/#入站)。
 
 | 字段 | 默认值 | 说明 |
 |------|--------|------|
+| `src_port` | `0` | 源 TCP 端口，仅客户端使用 |
 | `ttl` | `64` | 写入 IPv4 头的 TTL |
 | `mss` | `mtu - 40` | TCP 选项里通告的 MSS |
 | `window_scale` | `7` | TCP 选项里通告的窗口缩放 |
