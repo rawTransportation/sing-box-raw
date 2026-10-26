@@ -368,9 +368,7 @@ jobs:
             --architecture ${{ matrix.debian }} \
             dist/sing-box=/usr/bin/sing-box
           rm -rf $HOME/.gnupg
-          gpg --pinentry-mode loopback --passphrase "${{ secrets.GPG_PASSPHRASE }}" --import <<EOF
-          ${{ secrets.GPG_KEY }}
-          EOF
+          printf '%s' "${{ secrets.GPG_KEY_B64 }}" | base64 -d | gpg --pinentry-mode loopback --passphrase "${{ secrets.GPG_PASSPHRASE }}" --import
           debsigs --sign=origin -k ${{ secrets.GPG_KEY_ID }} --gpgopts '--pinentry-mode loopback --passphrase "${{ secrets.GPG_PASSPHRASE }}"' dist/*.deb
       - name: Package RPM
         if: matrix.rpm != ''
@@ -388,9 +386,7 @@ jobs:
           %_gpg_name ${{ secrets.GPG_KEY_ID }}
           %_gpg_sign_cmd_extra_args --pinentry-mode loopback --passphrase ${{ secrets.GPG_PASSPHRASE }}
           EOF
-          gpg --pinentry-mode loopback --passphrase "${{ secrets.GPG_PASSPHRASE }}" --import <<EOF
-          ${{ secrets.GPG_KEY }}
-          EOF
+          printf '%s' "${{ secrets.GPG_KEY_B64 }}" | base64 -d | gpg --pinentry-mode loopback --passphrase "${{ secrets.GPG_PASSPHRASE }}" --import
           rpmsign --addsign dist/*.rpm
       - name: Package Pacman
         if: matrix.pacman != ''
@@ -1195,7 +1191,7 @@ jobs:
       - name: Setup package signing
         run: |-
           set -euo pipefail
-          if [ -z "${GPG_KEY:-}" ]; then
+          if [ -z "${GPG_KEY_B64:-}" ]; then
             echo "GPG signing key is not configured, packages will be unsigned"
             exit 0
           fi
@@ -1208,7 +1204,7 @@ jobs:
             echo "GNUPGHOME=$SIGNING_GNUPG_HOME"
             echo "SIGNING_PASSPHRASE_FILE=$SIGNING_PASSPHRASE_FILE"
           } >> "$GITHUB_ENV"
-          printf '%s' "$GPG_KEY" | gpg \
+          printf '%s' "$GPG_KEY_B64" | base64 -d | gpg \
             --homedir "$SIGNING_GNUPG_HOME" \
             --batch \
             --pinentry-mode loopback \
@@ -1219,7 +1215,7 @@ jobs:
           %_gpg_sign_cmd_extra_args --pinentry-mode loopback --passphrase-file $SIGNING_PASSPHRASE_FILE
           EOF
         env:
-          GPG_KEY: ${{ secrets.GPG_KEY }}
+          GPG_KEY_B64: ${{ secrets.GPG_KEY_B64 }}
           GPG_KEY_ID: ${{ secrets.GPG_KEY_ID }}
           GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
       - name: Sign Linux packages
