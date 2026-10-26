@@ -10,9 +10,11 @@ This fork signs its own artifacts. No upstream signing keys are used.
 GPG fingerprint: `2A39 910E F3EB 3444 FB32 4486 9372 B0ED 15DE 91E1`
 
 The private half of both keys only exists as GitHub Actions secrets on this
-repository (`WINDOWS_CERTIFICATES_P12`, `WINDOWS_P12_PASSWORD`, `GPG_KEY`,
-`GPG_KEY_ID`, `GPG_PASSPHRASE`). When a secret is missing, the build falls back
-to unsigned artifacts instead of failing.
+repository (`WINDOWS_CERTIFICATES_P12`, `WINDOWS_P12_PASSWORD`, `GPG_KEY_B64`,
+`GPG_KEY_ID`, `GPG_PASSPHRASE`). The GPG key is stored base64 encoded because
+secret values round-tripped through shell pipelines tend to pick up stray CR/LF
+bytes, which makes `gpg --import` reject the block. When a secret is missing,
+the build falls back to unsigned artifacts instead of failing.
 
 ## Verify
 
