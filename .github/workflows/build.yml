@@ -1035,6 +1035,11 @@ jobs:
           go run -v ./cmd/internal/update_desktop_version --ci --nightly
       - name: Setup signing
         run: |-
+          if ([string]::IsNullOrWhiteSpace($env:WINDOWS_CERTIFICATES_P12)) {
+            Write-Host "Windows code signing certificate is not configured, packaging without signing"
+            '{"windows":{}}' | Set-Content -Encoding utf8NoBOM clients/desktop/signing.local.json
+            exit 0
+          }
           $certificatePath = Join-Path $env:RUNNER_TEMP "windows-signing.p12"
           [IO.File]::WriteAllBytes($certificatePath, [Convert]::FromBase64String($env:WINDOWS_CERTIFICATES_P12))
           @{
@@ -1190,6 +1195,10 @@ jobs:
       - name: Setup package signing
         run: |-
           set -euo pipefail
+          if [ -z "${GPG_KEY:-}" ]; then
+            echo "GPG signing key is not configured, packages will be unsigned"
+            exit 0
+          fi
           SIGNING_GNUPG_HOME="$RUNNER_TEMP/package-signing-gnupg"
           SIGNING_PASSPHRASE_FILE="$RUNNER_TEMP/package-signing-passphrase"
           mkdir -m 700 "$SIGNING_GNUPG_HOME"
@@ -1216,6 +1225,10 @@ jobs:
       - name: Sign Linux packages
         run: |-
           set -euo pipefail
+          if [ -z "${GPG_KEY_ID:-}" ]; then
+            echo "GPG signing key is not configured, skipping package signing"
+            exit 0
+          fi
           debsigs \
             --sign=origin \
             -k "$GPG_KEY_ID" \
