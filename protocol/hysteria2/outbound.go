@@ -144,7 +144,7 @@ func NewOutbound(ctx context.Context, router adapter.Router, logger log.ContextL
 		}
 	}
 	networkList := options.Network.Build()
-	var clientDialer N.Dialer = outboundDialer
+	clientDialer := outboundDialer
 	if options.UDP2Raw != nil {
 		clientDialer = newUDP2RawDialer(outboundDialer, logger, M.ParseSocksaddr(options.Server).Fqdn, options.UDP2Raw)
 	}
