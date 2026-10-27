@@ -1,7 +1,8 @@
 name: Test
 
 on:
-  push:
+  # Branch pushes run nothing in this fork; tests run on pull requests only.
+  pull_request:
     branches:
       - oldstable
       - stable
@@ -11,12 +12,6 @@ on:
       - '**.md'
       - '.github/**'
       - '!.github/workflows/test.yml'
-  pull_request:
-    branches:
-      - oldstable
-      - stable
-      - testing
-      - unstable
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}-${{ inputs.build }}
